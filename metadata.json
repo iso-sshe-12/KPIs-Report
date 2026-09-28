@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix FY2026 KPIs Dashboard (KRC)",
+  "description": "Executive KPI Dashboard for FY2026 with Google Sheets integration, 10-minute auto-refresh, and email notification alerts for below-target metrics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
