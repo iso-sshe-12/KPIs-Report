@@ -5,13 +5,45 @@ import { DepartmentCode, DepartmentSummary, KPIItem, SyncSettings } from '../typ
 const STORAGE_KEY_SHEET_URL = 'fy2026_kpi_sheet_url';
 const STORAGE_KEY_INTERVAL = 'fy2026_kpi_sync_interval';
 const STORAGE_KEY_AUTO_SYNC = 'fy2026_kpi_auto_sync';
-const STORAGE_KEY_CACHED_CSV = 'fy2026_kpi_cached_csv_v5';
+const STORAGE_KEY_CACHED_CSV = 'fy2026_kpi_cached_csv_v6';
 
 export const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1example-fy2026-executive-kpi/edit#gid=0';
 
+export function getResolvedSheetUrl(providedUrl?: string): string {
+  if (providedUrl && providedUrl.trim()) return providedUrl.trim();
+
+  // 1. Check URL query parameters (useful for Google Sites iframe: ?sheet=... or ?sheetUrl=...)
+  if (typeof window !== 'undefined' && window.location) {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const paramUrl = params.get('sheetUrl') || params.get('sheet');
+      if (paramUrl && paramUrl.trim()) {
+        const decoded = decodeURIComponent(paramUrl.trim());
+        localStorage.setItem(STORAGE_KEY_SHEET_URL, decoded);
+        return decoded;
+      }
+    } catch (e) {
+      // Ignore URL parsing errors
+    }
+  }
+
+  // 2. Check localStorage
+  const savedUrl = localStorage.getItem(STORAGE_KEY_SHEET_URL);
+  if (savedUrl && savedUrl.trim()) return savedUrl.trim();
+
+  // 3. Check Vite environment variable
+  const envUrl = ((import.meta as any).env?.VITE_GOOGLE_SHEET_URL as string) || '';
+  if (envUrl && envUrl.trim()) return envUrl.trim();
+
+  return '';
+}
+
 export function getInitialSyncSettings(): SyncSettings {
-  const savedUrl = localStorage.getItem(STORAGE_KEY_SHEET_URL) || '';
-  const savedInterval = parseInt(localStorage.getItem(STORAGE_KEY_INTERVAL) || '10', 10);
+  const savedUrl = getResolvedSheetUrl();
+  const storedInterval = localStorage.getItem(STORAGE_KEY_INTERVAL);
+  const parsedInterval = storedInterval ? parseInt(storedInterval, 10) : 60;
+  // Default to 60 minutes (1 hour). If previously set to legacy 10-minute default, automatically migrate to 60 minutes.
+  const savedInterval = isNaN(parsedInterval) || parsedInterval === 10 ? 60 : parsedInterval;
   const autoSync = localStorage.getItem(STORAGE_KEY_AUTO_SYNC) !== 'false';
 
   return {
@@ -19,7 +51,7 @@ export function getInitialSyncSettings(): SyncSettings {
     sheetId: extractSheetId(savedUrl),
     sheetGid: extractGid(savedUrl),
     autoSyncEnabled: autoSync,
-    intervalMinutes: isNaN(savedInterval) ? 10 : savedInterval,
+    intervalMinutes: savedInterval,
     lastSyncTime: null,
     syncStatus: 'idle',
   };
@@ -48,25 +80,55 @@ export function extractGid(url: string): string {
 }
 
 export async function fetchKpiData(url?: string): Promise<{ items: KPIItem[]; rawCsv: string; source: 'google_sheets' | 'cached' | 'default' }> {
-  const targetUrl = url || localStorage.getItem(STORAGE_KEY_SHEET_URL);
+  const targetUrl = getResolvedSheetUrl(url);
 
   if (targetUrl && targetUrl.trim()) {
+    const cleanUrl = targetUrl.trim();
+
+    // Step 1: Try server-side proxy (bypasses CORS and injects fresh headers)
     try {
-      const response = await fetch(`/api/sheets/fetch?url=${encodeURIComponent(targetUrl.trim())}`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `HTTP ${response.status}`);
-      }
-      const csvText = await response.text();
-      if (csvText && csvText.length > 50) {
-        localStorage.setItem(STORAGE_KEY_CACHED_CSV, csvText);
-        const parsed = parseKpiCsv(csvText);
-        if (parsed.length > 0) {
-          return { items: parsed, rawCsv: csvText, source: 'google_sheets' };
+      const response = await fetch(`/api/sheets/fetch?url=${encodeURIComponent(cleanUrl)}&_t=${Date.now()}`);
+      if (response.ok) {
+        const csvText = await response.text();
+        if (csvText && csvText.length > 50) {
+          localStorage.setItem(STORAGE_KEY_CACHED_CSV, csvText);
+          const parsed = parseKpiCsv(csvText);
+          if (parsed.length > 0) {
+            return { items: parsed, rawCsv: csvText, source: 'google_sheets' };
+          }
         }
       }
-    } catch (err) {
-      console.warn('Live Google Sheets fetch failed, checking cached or default data:', err);
+    } catch (proxyErr) {
+      console.warn('Backend proxy fetch unavailable (likely static host such as GitHub Pages):', proxyErr);
+    }
+
+    // Step 2: Direct Client-side fetch fallback (works on GitHub Pages / Static Hosting / Google Sites iframe)
+    const sheetId = extractSheetId(cleanUrl);
+    const gid = extractGid(cleanUrl);
+
+    if (sheetId) {
+      const fallbackUrls = [
+        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&_t=${Date.now()}`,
+        `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}&_t=${Date.now()}`,
+      ];
+
+      for (const directUrl of fallbackUrls) {
+        try {
+          const directRes = await fetch(directUrl);
+          if (directRes.ok) {
+            const csvText = await directRes.text();
+            if (csvText && csvText.length > 50) {
+              localStorage.setItem(STORAGE_KEY_CACHED_CSV, csvText);
+              const parsed = parseKpiCsv(csvText);
+              if (parsed.length > 0) {
+                return { items: parsed, rawCsv: csvText, source: 'google_sheets' };
+              }
+            }
+          }
+        } catch (directErr) {
+          console.warn(`Direct client fetch from ${directUrl} failed:`, directErr);
+        }
+      }
     }
   }
 

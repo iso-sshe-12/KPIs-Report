@@ -187,7 +187,6 @@ export function parseKpiCsv(csvText: string): KPIItem[] {
       'Procurement': 'PU',
       'Procurement (PU)': 'PU',
       'HR & GA': 'HR&GA',
-      'HR&GA': 'HR&GA',
       'ฝ่ายทรัพยากรบุคคลและบริหารงานทั่วไป': 'HR&GA',
       'ฝ่ายทรัพยากรบุคคลและบริหารงานทั่วไป (HR & GA)': 'HR&GA',
       'ฝ่ายทรัพยากรบุคคลและบริหารงานทั่วไป (HR&GA)': 'HR&GA',

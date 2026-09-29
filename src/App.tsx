@@ -82,8 +82,13 @@ export default function App() {
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState<boolean>(false);
   const effectiveIsAdmin = isAdmin && !isViewerPreview;
 
-  // 10-minute countdown timer (in seconds)
-  const [secondsRemaining, setSecondsRemaining] = useState<number>(() => (syncSettings.intervalMinutes || 10) * 60);
+  // Auto-refresh countdown timer (in seconds, default 60 minutes = 1 hour)
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(() => (syncSettings.intervalMinutes || 60) * 60);
+
+  // Sync timer with updated interval setting
+  useEffect(() => {
+    setSecondsRemaining((syncSettings.intervalMinutes || 60) * 60);
+  }, [syncSettings.intervalMinutes]);
 
   // Department summaries
   const departments = useMemo(() => computeDepartmentSummaries(items), [items]);
@@ -119,7 +124,7 @@ export default function App() {
     loadInitialData();
   }, []);
 
-  // Timer countdown and 10-minute auto-refresh trigger
+  // Timer countdown and 1-hour (or configured interval) auto-refresh trigger
   useEffect(() => {
     if (!syncSettings.autoSyncEnabled) return;
 
@@ -128,7 +133,7 @@ export default function App() {
         if (prev <= 1) {
           // Timer triggered: auto-sync
           handleSync(true);
-          return (syncSettings.intervalMinutes || 10) * 60;
+          return (syncSettings.intervalMinutes || 60) * 60;
         }
         return prev - 1;
       });
@@ -174,13 +179,15 @@ export default function App() {
         );
       } else {
         showToast(
-          isAuto ? 'อัพเดตข้อมูลรอบอัตโนมัติเรียบร้อย' : 'ซิงค์ข้อมูลล่าสุดสำเร็จ',
+          isAuto
+            ? 'อัพเดตข้อมูลและ Dashboard อัตโนมัติเรียบร้อย'
+            : 'ซิงค์และอัพเดตข้อมูล Dashboard ล่าสุดสำเร็จ',
           'success'
         );
       }
 
       // Reset countdown timer
-      setSecondsRemaining((syncSettings.intervalMinutes || 10) * 60);
+      setSecondsRemaining((syncSettings.intervalMinutes || 60) * 60);
       return true;
     } catch (err: any) {
       console.error('Sync failed:', err);
@@ -345,10 +352,27 @@ export default function App() {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px]">
-            <span className="flex items-center gap-1 text-slate-600">
-              <Clock className="h-3 w-3 text-slate-400" />
-              {t.subheader.syncTimer} <strong>{syncSettings.intervalMinutes} {language === 'th' ? 'นาที' : 'mins'}</strong>
+            <span className="flex items-center gap-1 text-slate-700 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200">
+              <Clock className="h-3 w-3 text-emerald-600" />
+              {t.subheader.syncTimer}{' '}
+              <strong>
+                {syncSettings.intervalMinutes === 60
+                  ? language === 'th'
+                    ? '1 ชั่วโมง'
+                    : '1 hour'
+                  : `${syncSettings.intervalMinutes} ${language === 'th' ? 'นาที' : 'mins'}`}
+              </strong>
             </span>
+            {syncSettings.lastSyncTime && (
+              <span className="text-slate-500 hidden sm:inline">
+                ({language === 'th' ? 'อัพเดตล่าสุด' : 'Last sync'}:{' '}
+                {new Date(syncSettings.lastSyncTime).toLocaleTimeString(
+                  language === 'th' ? 'th-TH' : 'en-US',
+                  { hour: '2-digit', minute: '2-digit', second: '2-digit' }
+                )}{' '}
+                {language === 'th' ? 'น.' : ''})
+              </span>
+            )}
             {effectiveIsAdmin && (
               <>
                 <span>•</span>

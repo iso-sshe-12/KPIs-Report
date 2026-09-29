@@ -112,7 +112,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                 ตั้งค่าการดึงข้อมูลจาก Google Sheets
               </h2>
               <p className="text-xs text-slate-300 mt-0.5">
-                เชื่อมต่อไฟล์สเปรดชีตจริง & ตั้งเวลาอัพเดตอัตโนมัติรอบทุก 10 นาที
+                เชื่อมต่อไฟล์สเปรดชีตจริง & ตั้งเวลาอัพเดตอัตโนมัติรอบทุก 1 ชั่วโมง (หรือกดซิงค์ข้อมูลได้ทันที)
               </p>
             </div>
           </div>
@@ -221,28 +221,28 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                 </div>
 
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                  {[1, 5, 10, 15, 30, 60].map((mins) => (
+                  {[10, 15, 30, 60, 120, 240].map((mins) => (
                     <button
                       key={mins}
                       type="button"
                       onClick={() => setIntervalMinutes(mins)}
                       className={`rounded-lg border py-2 text-xs font-semibold transition-all cursor-pointer ${
                         intervalMinutes === mins
-                          ? 'border-slate-900 bg-slate-900 text-white shadow-2xs'
+                          ? 'border-emerald-600 bg-slate-900 text-white shadow-2xs'
                           : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100'
                       }`}
                     >
-                      {mins} นาที
-                      {mins === 10 && (
-                        <span className="block text-[9px] font-normal opacity-80">
-                          (ที่แนะนำ)
+                      {mins === 60 ? '1 ชั่วโมง' : mins === 120 ? '2 ชั่วโมง' : mins === 240 ? '4 ชั่วโมง' : `${mins} นาที`}
+                      {mins === 60 && (
+                        <span className="block text-[9px] font-normal text-emerald-400">
+                          (แนะนำ/1 ชม.)
                         </span>
                       )}
                     </button>
                   ))}
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  เมื่อเปิดใช้งาน ระบบจะมีนาฬิกานับถอยหลังบนแถบด้านบน และดึงข้อมูลใหม่ทุกๆ {intervalMinutes} นาที
+                  เมื่อเปิดใช้งาน ระบบจะมีนาฬิกานับถอยหลังบนแถบด้านบน และดึงข้อมูลใหม่จาก Google Sheets อัตโนมัติทุกๆ {intervalMinutes === 60 ? '1 ชั่วโมง' : intervalMinutes > 60 ? `${intervalMinutes / 60} ชั่วโมง` : `${intervalMinutes} นาที`} (และท่านสามารถกดปุ่ม "ซิงค์ข้อมูล" บนเมนูบาร์เพื่อดึงข้อมูลล่าสุดได้ทันทีตลอดเวลา)
                 </p>
               </div>
             </div>
@@ -304,6 +304,22 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                     หรือเลือกเมนู <strong>ไฟล์ (File) &gt; แชร์ (Share) &gt; เผยแพร่ไปยังเว็บ (Publish to web)</strong> แล้วเลือกเป็นไฟล์ CSV
                   </li>
                 </ol>
+              </div>
+
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-2">
+                <h4 className="font-bold text-emerald-900 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  สำหรับผู้ใช้งานที่นำไปฝังใน Google Sites / เว็บไซต์องค์กร:
+                </h4>
+                <p className="text-emerald-950 leading-relaxed text-[11.5px]">
+                  เมื่อนำ Dashboard ไปฝังใน Google Site (ผ่าน Embed / iframe) เบราว์เซอร์อาจแยกพื้นที่จัดเก็บข้อมูลทำให้ไม่จำค่า ให้ใช้วิธีแนบลิงก์ชีตต่อท้าย URL ตอนฝัง เช่น:
+                </p>
+                <code className="block rounded-lg bg-emerald-950 p-2 font-mono text-[11px] text-emerald-200 break-all select-all">
+                  https://your-dashboard-domain/?sheet=https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit#gid=0
+                </code>
+                <p className="text-emerald-900 text-[11px]">
+                  ระบบจะตรวจจับลิงก์ Google Sheets โดยอัตโนมัติ และดึงข้อมูลจริงมาอัพเดตแบบ Real-time ทุก 1 ชั่วโมง หรือทุกครั้งที่กดซิงค์ข้อมูล
+                </p>
               </div>
             </div>
           )}

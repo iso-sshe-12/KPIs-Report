@@ -54,8 +54,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { language, setLanguage, t } = useLanguage();
 
   const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
+    const hours = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
+    if (hours > 0) {
+      return `${hours}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
@@ -133,9 +137,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Auto-Refresh Timer Badge */}
-            <div className="hidden lg:flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-xs text-slate-700">
-              <Clock className="h-3.5 w-3.5 text-slate-500" />
-              <span>{t.navbar.syncInterval} {syncSettings.intervalMinutes}m:</span>
+            <div
+              className="hidden lg:flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-xs text-slate-700"
+              title={
+                language === 'th'
+                  ? `รอบอัพเดตอัตโนมัติทุก ${syncSettings.intervalMinutes === 60 ? '1 ชั่วโมง' : `${syncSettings.intervalMinutes} นาที`} (หรือกดซิงค์ข้อมูลได้ตลอดเวลา)`
+                  : `Auto-refresh every ${syncSettings.intervalMinutes === 60 ? '1 hour' : `${syncSettings.intervalMinutes}m`} (or click Sync Now anytime)`
+              }
+            >
+              <Clock className="h-3.5 w-3.5 text-emerald-600" />
+              <span>
+                {t.navbar.syncInterval}{' '}
+                {syncSettings.intervalMinutes === 60
+                  ? language === 'th'
+                    ? '1 ชม.'
+                    : '1h'
+                  : `${syncSettings.intervalMinutes}m`}
+                :
+              </span>
               <span className="font-mono font-semibold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200">
                 {formatTime(secondsRemaining)}
               </span>
@@ -146,11 +165,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="btn-sync-now"
               onClick={onManualSync}
               disabled={isSyncing}
-              title={language === 'th' ? 'ดึงข้อมูลล่าสุดตอนนี้' : 'Sync latest data now'}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 sm:px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 disabled:opacity-50 transition-colors shadow-2xs cursor-pointer"
+              title={
+                language === 'th'
+                  ? 'กดเพื่อดึงข้อมูลล่าสุดจาก Google Sheets และอัพเดต Dashboard ทันที'
+                  : 'Sync latest data from Google Sheets & update dashboard now'
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50/80 hover:bg-emerald-100/90 text-emerald-800 px-2.5 sm:px-3 py-1.5 text-xs font-semibold active:bg-emerald-200 disabled:opacity-50 transition-colors shadow-2xs cursor-pointer"
             >
-              <RefreshCw className={`h-3.5 w-3.5 text-slate-600 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isSyncing ? t.navbar.syncing : t.navbar.syncNow}</span>
+              <RefreshCw className={`h-3.5 w-3.5 text-emerald-700 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? t.navbar.syncing : t.navbar.syncNow}</span>
             </button>
 
 

@@ -107,7 +107,7 @@ export interface NotificationLog {
     month?: string;
   }>;
   status: 'sent' | 'queued' | 'failed';
-  triggerType: 'monthly_schedule' | 'manual' | 'test' | 'auto_10min';
+  triggerType: 'monthly_schedule' | 'manual' | 'test' | 'auto_hourly' | 'auto_10min';
 }
 
 export interface SyncSettings {
@@ -115,7 +115,7 @@ export interface SyncSettings {
   sheetId: string;
   sheetGid: string;
   autoSyncEnabled: boolean;
-  intervalMinutes: number; // default 10
+  intervalMinutes: number; // default 60 (1 hour)
   lastSyncTime: string | null;
   syncStatus: 'idle' | 'syncing' | 'success' | 'error';
   errorMessage?: string;

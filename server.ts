@@ -34,9 +34,15 @@ async function startServer() {
         targetFetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
       }
 
-      const response = await fetch(targetFetchUrl, {
+      // Add cache buster to upstream fetch so Google Sheets always returns the most recent edit
+      const sep = targetFetchUrl.includes('?') ? '&' : '?';
+      const freshFetchUrl = `${targetFetchUrl}${sep}_t=${Date.now()}`;
+
+      const response = await fetch(freshFetchUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
           Accept: 'text/csv,text/plain,*/*',
         },
       });
@@ -49,6 +55,8 @@ async function startServer() {
 
       const csvData = await response.text();
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
       res.send(csvData);
     } catch (error: any) {
       console.error('Error fetching sheet:', error);
