@@ -5,7 +5,28 @@ import { DepartmentCode, DepartmentSummary, KPIItem, SyncSettings } from '../typ
 const STORAGE_KEY_SHEET_URL = 'fy2026_kpi_sheet_url';
 const STORAGE_KEY_INTERVAL = 'fy2026_kpi_sync_interval';
 const STORAGE_KEY_AUTO_SYNC = 'fy2026_kpi_auto_sync';
-const STORAGE_KEY_CACHED_CSV = 'fy2026_kpi_cached_csv_v6';
+export const STORAGE_KEY_CACHED_CSV = 'fy2026_kpi_cached_csv_v7';
+
+export function safeGetLocalStorage(key: string): string | null {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+  } catch (e) {
+    // Sandboxed iframe or cookies disabled
+  }
+  return null;
+}
+
+export function safeSetLocalStorage(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  } catch (e) {
+    // Sandboxed iframe or cookies disabled
+  }
+}
 
 export const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1example-fy2026-executive-kpi/edit#gid=0';
 
@@ -19,7 +40,7 @@ export function getResolvedSheetUrl(providedUrl?: string): string {
       const paramUrl = params.get('sheetUrl') || params.get('sheet');
       if (paramUrl && paramUrl.trim()) {
         const decoded = decodeURIComponent(paramUrl.trim());
-        localStorage.setItem(STORAGE_KEY_SHEET_URL, decoded);
+        safeSetLocalStorage(STORAGE_KEY_SHEET_URL, decoded);
         return decoded;
       }
     } catch (e) {
@@ -28,7 +49,7 @@ export function getResolvedSheetUrl(providedUrl?: string): string {
   }
 
   // 2. Check localStorage
-  const savedUrl = localStorage.getItem(STORAGE_KEY_SHEET_URL);
+  const savedUrl = safeGetLocalStorage(STORAGE_KEY_SHEET_URL);
   if (savedUrl && savedUrl.trim()) return savedUrl.trim();
 
   // 3. Check Vite environment variable
@@ -40,11 +61,11 @@ export function getResolvedSheetUrl(providedUrl?: string): string {
 
 export function getInitialSyncSettings(): SyncSettings {
   const savedUrl = getResolvedSheetUrl();
-  const storedInterval = localStorage.getItem(STORAGE_KEY_INTERVAL);
+  const storedInterval = safeGetLocalStorage(STORAGE_KEY_INTERVAL);
   const parsedInterval = storedInterval ? parseInt(storedInterval, 10) : 60;
   // Default to 60 minutes (1 hour). If previously set to legacy 10-minute default, automatically migrate to 60 minutes.
   const savedInterval = isNaN(parsedInterval) || parsedInterval === 10 ? 60 : parsedInterval;
-  const autoSync = localStorage.getItem(STORAGE_KEY_AUTO_SYNC) !== 'false';
+  const autoSync = safeGetLocalStorage(STORAGE_KEY_AUTO_SYNC) !== 'false';
 
   return {
     sheetUrl: savedUrl,
@@ -59,24 +80,65 @@ export function getInitialSyncSettings(): SyncSettings {
 
 export function saveSyncSettings(settings: Partial<SyncSettings>) {
   if (settings.sheetUrl !== undefined) {
-    localStorage.setItem(STORAGE_KEY_SHEET_URL, settings.sheetUrl);
+    safeSetLocalStorage(STORAGE_KEY_SHEET_URL, settings.sheetUrl);
   }
   if (settings.intervalMinutes !== undefined) {
-    localStorage.setItem(STORAGE_KEY_INTERVAL, settings.intervalMinutes.toString());
+    safeSetLocalStorage(STORAGE_KEY_INTERVAL, settings.intervalMinutes.toString());
   }
   if (settings.autoSyncEnabled !== undefined) {
-    localStorage.setItem(STORAGE_KEY_AUTO_SYNC, settings.autoSyncEnabled ? 'true' : 'false');
+    safeSetLocalStorage(STORAGE_KEY_AUTO_SYNC, settings.autoSyncEnabled ? 'true' : 'false');
   }
 }
 
 export function extractSheetId(url: string): string {
+  // Published web link format: /d/e/(2PACX-...)/pub
+  const pubMatch = url.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
+  if (pubMatch) return pubMatch[1];
+
+  // Standard sheet ID format: /d/([a-zA-Z0-9-_]+)
   const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-  return match ? match[1] : '';
+  if (match && match[1] !== 'e') return match[1];
+
+  return '';
 }
 
 export function extractGid(url: string): string {
-  const match = url.match(/gid=([0-9]+)/);
+  const match = url.match(/[?&#]gid=([0-9]+)/);
   return match ? match[1] : '0';
+}
+
+export function buildPossibleCsvUrls(cleanUrl: string): string[] {
+  const urls: string[] = [];
+
+  // 1. If it already has CSV export parameter, try it directly
+  if (cleanUrl.includes('output=csv') || cleanUrl.includes('format=csv') || cleanUrl.includes('tqx=out:csv')) {
+    urls.push(cleanUrl);
+  }
+
+  const gid = extractGid(cleanUrl);
+
+  // 2. Published web link: /d/e/2PACX-...
+  const pubMatch = cleanUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
+  if (pubMatch) {
+    const pubId = pubMatch[1];
+    urls.push(`https://docs.google.com/spreadsheets/d/e/${pubId}/pub?output=csv${gid !== '0' ? `&gid=${gid}` : ''}`);
+    urls.push(`https://docs.google.com/spreadsheets/d/e/${pubId}/pub?output=csv`);
+  }
+
+  // 3. Standard Google Sheets URL: /d/SHEET_ID
+  const match = cleanUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  if (match && match[1] !== 'e') {
+    const sheetId = match[1];
+    urls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`);
+    urls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`);
+  }
+
+  // 4. Fallback: URL itself if not yet added
+  if (!urls.includes(cleanUrl)) {
+    urls.push(cleanUrl);
+  }
+
+  return urls;
 }
 
 export async function fetchKpiData(url?: string): Promise<{ items: KPIItem[]; rawCsv: string; source: 'google_sheets' | 'cached' | 'default' }> {
@@ -90,8 +152,8 @@ export async function fetchKpiData(url?: string): Promise<{ items: KPIItem[]; ra
       const response = await fetch(`/api/sheets/fetch?url=${encodeURIComponent(cleanUrl)}&_t=${Date.now()}`);
       if (response.ok) {
         const csvText = await response.text();
-        if (csvText && csvText.length > 50) {
-          localStorage.setItem(STORAGE_KEY_CACHED_CSV, csvText);
+        if (csvText && csvText.length > 50 && !csvText.includes('<!DOCTYPE html>') && !csvText.includes('accounts.google.com')) {
+          safeSetLocalStorage(STORAGE_KEY_CACHED_CSV, csvText);
           const parsed = parseKpiCsv(csvText);
           if (parsed.length > 0) {
             return { items: parsed, rawCsv: csvText, source: 'google_sheets' };
@@ -103,37 +165,55 @@ export async function fetchKpiData(url?: string): Promise<{ items: KPIItem[]; ra
     }
 
     // Step 2: Direct Client-side fetch fallback (works on GitHub Pages / Static Hosting / Google Sites iframe)
-    const sheetId = extractSheetId(cleanUrl);
-    const gid = extractGid(cleanUrl);
+    const possibleUrls = buildPossibleCsvUrls(cleanUrl);
 
-    if (sheetId) {
-      const fallbackUrls = [
-        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&_t=${Date.now()}`,
-        `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}&_t=${Date.now()}`,
-      ];
-
-      for (const directUrl of fallbackUrls) {
-        try {
-          const directRes = await fetch(directUrl);
-          if (directRes.ok) {
-            const csvText = await directRes.text();
-            if (csvText && csvText.length > 50) {
-              localStorage.setItem(STORAGE_KEY_CACHED_CSV, csvText);
-              const parsed = parseKpiCsv(csvText);
-              if (parsed.length > 0) {
-                return { items: parsed, rawCsv: csvText, source: 'google_sheets' };
-              }
+    for (const rawFetchUrl of possibleUrls) {
+      const sep = rawFetchUrl.includes('?') ? '&' : '?';
+      const freshUrl = `${rawFetchUrl}${sep}_t=${Date.now()}`;
+      try {
+        const directRes = await fetch(freshUrl, {
+          headers: {
+            Accept: 'text/csv,text/plain,*/*',
+          },
+        });
+        if (directRes.ok) {
+          const csvText = await directRes.text();
+          if (csvText && csvText.length > 50 && !csvText.includes('<!DOCTYPE html>') && !csvText.includes('accounts.google.com')) {
+            safeSetLocalStorage(STORAGE_KEY_CACHED_CSV, csvText);
+            const parsed = parseKpiCsv(csvText);
+            if (parsed.length > 0) {
+              return { items: parsed, rawCsv: csvText, source: 'google_sheets' };
             }
           }
-        } catch (directErr) {
-          console.warn(`Direct client fetch from ${directUrl} failed:`, directErr);
         }
+      } catch (directErr) {
+        console.warn(`Direct client fetch from ${freshUrl} failed:`, directErr);
+      }
+    }
+
+    // Step 3: CORS proxy fallback for GitHub Pages when Google Sheets lacks CORS headers
+    for (const rawFetchUrl of possibleUrls) {
+      const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rawFetchUrl)}&_t=${Date.now()}`;
+      try {
+        const proxyRes = await fetch(corsProxyUrl);
+        if (proxyRes.ok) {
+          const csvText = await proxyRes.text();
+          if (csvText && csvText.length > 50 && !csvText.includes('<!DOCTYPE html>') && !csvText.includes('accounts.google.com')) {
+            safeSetLocalStorage(STORAGE_KEY_CACHED_CSV, csvText);
+            const parsed = parseKpiCsv(csvText);
+            if (parsed.length > 0) {
+              return { items: parsed, rawCsv: csvText, source: 'google_sheets' };
+            }
+          }
+        }
+      } catch (e) {
+        // Silently continue
       }
     }
   }
 
   // Check cached CSV in localStorage
-  const cached = localStorage.getItem(STORAGE_KEY_CACHED_CSV);
+  const cached = safeGetLocalStorage(STORAGE_KEY_CACHED_CSV);
   if (cached) {
     try {
       const parsed = parseKpiCsv(cached);

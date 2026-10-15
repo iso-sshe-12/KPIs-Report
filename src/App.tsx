@@ -28,12 +28,14 @@ import { KpiReportModal, KpiReportSubmission } from './components/KpiReportModal
 import { TrackedKpisTab } from './components/TrackedKpisTab';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { checkIsAdmin, setAdminAuthorized } from './services/authService';
+import { DEFAULT_RAW_CSV } from './data/rawKpiCsv';
 import { isFailingTarget, parseKpiCsv, parseNumericValue } from './services/kpiParser';
 import {
   computeDepartmentSummaries,
   fetchKpiData,
   getInitialSyncSettings,
   saveSyncSettings,
+  STORAGE_KEY_CACHED_CSV,
 } from './services/googleSheetsService';
 import {
   getInitialGoogleChatSettings,
@@ -204,7 +206,8 @@ export default function App() {
       const parsed = parseKpiCsv(csvText);
       if (parsed.length > 0) {
         setItems(parsed);
-        setDataSource('cached');
+        localStorage.setItem(STORAGE_KEY_CACHED_CSV, csvText);
+        setDataSource(csvText === DEFAULT_RAW_CSV ? 'default' : 'cached');
         showToast(`อัพเดตข้อมูลสำเร็จ (${parsed.length} ตัวชี้วัด)`);
       }
     } catch (err) {

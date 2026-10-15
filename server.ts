@@ -26,12 +26,16 @@ async function startServer() {
       let targetFetchUrl = sheetUrl;
 
       // Extract Sheet ID and GID if user provided a standard Google Sheets web link
-      const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if (match && !sheetUrl.includes('/pub') && !sheetUrl.includes('/export')) {
-        const sheetId = match[1];
-        const gidMatch = sheetUrl.match(/gid=([0-9]+)/);
-        const gid = gidMatch ? gidMatch[1] : '0';
-        targetFetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+      if (sheetUrl.includes('/d/e/') && sheetUrl.includes('/pubhtml')) {
+        targetFetchUrl = sheetUrl.replace('/pubhtml', '/pub?output=csv');
+      } else {
+        const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1] !== 'e' && !sheetUrl.includes('/pub') && !sheetUrl.includes('/export')) {
+          const sheetId = match[1];
+          const gidMatch = sheetUrl.match(/gid=([0-9]+)/);
+          const gid = gidMatch ? gidMatch[1] : '0';
+          targetFetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+        }
       }
 
       // Add cache buster to upstream fetch so Google Sheets always returns the most recent edit
@@ -169,7 +173,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`FY2026 Executive KPI Dashboard server running on http://localhost:${PORT}`);
+    console.log(`FY2026 KPI Dashboard server running on http://localhost:${PORT}`);
   });
 }
 

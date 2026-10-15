@@ -208,7 +208,7 @@ export function generateEmailHtml(
   const html = `
     <div style="font-family: 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
       <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 24px; color: #ffffff;">
-        <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;">FY2026 Executive KPI Dashboard</div>
+        <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;">FY2026 KPI Dashboard</div>
         <h1 style="margin: 6px 0 0 0; font-size: 20px; font-weight: 700; color: #ffffff;">รายงานสรุปตัวชี้วัดที่ต่ำกว่าเป้าหมาย (KPI Breach Alert)</h1>
         <p style="margin: 4px 0 0 0; font-size: 13px; color: #cbd5e1;">การตรวจสอบรอบ: ${timestamp} (${triggerLabel})</p>
       </div>
@@ -243,7 +243,7 @@ export function generateEmailHtml(
   `;
 
   const text = `
-FY2026 Executive KPI Dashboard - KPI Breach Alert
+FY2026 KPI Dashboard - KPI Breach Alert
 เวลาตรวจสอบ: ${timestamp} (${triggerLabel})
 ตรวจพบ KPI ไม่บรรลุเป้าหมาย ${breachedList.length} รายการ:
 
@@ -258,7 +258,7 @@ ${breachedList
   )
   .join('\n\n')}
 
-ส่งจากระบบ FY2026 Executive KPI Dashboard
+ส่งจากระบบ FY2026 KPI Dashboard
 `;
 
   return { subject, html, text };

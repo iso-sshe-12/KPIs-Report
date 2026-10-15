@@ -136,7 +136,7 @@ _ระบบแจ้งเตือนอัตโนมัติ FY2026 Execu
                   buttonList: {
                     buttons: [
                       {
-                        text: '📊 เปิดดู Executive KPI Dashboard',
+                        text: '📊 เปิดดู KPI Dashboard',
                         onClick: {
                           openLink: {
                             url: window.location.origin,

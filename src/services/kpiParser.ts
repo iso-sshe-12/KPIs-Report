@@ -262,10 +262,18 @@ export function parseKpiCsv(csvText: string): KPIItem[] {
     // Split Thai and English names if present
     let nameTh = rawFullName;
     let nameEn = '';
-    const matchParen = rawFullName.match(/^(.*?)\s*\((.*?)\)\s*$/);
-    if (matchParen) {
-      nameTh = matchParen[1].trim();
-      nameEn = matchParen[2].trim();
+    const matchTrailingEn = rawFullName.match(
+      /^(.*?)\s*\(([^()]*\([^()]*\)[^()]*|[A-Za-z0-9\s.,/&%'-]+)\)\s*$/
+    );
+    if (matchTrailingEn) {
+      nameTh = matchTrailingEn[1].trim();
+      nameEn = matchTrailingEn[2].trim();
+    } else {
+      const matchParen = rawFullName.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
+      if (matchParen) {
+        nameTh = matchParen[1].trim();
+        nameEn = matchParen[2].trim();
+      }
     }
 
     const targetParsed = parseTarget(targetRaw);
@@ -302,6 +310,11 @@ export function parseKpiCsv(csvText: string): KPIItem[] {
       }
     });
 
+    // Valid numeric monthly values
+    const validMonthlyValues = Object.values(monthlyValues)
+      .map((m) => m.value)
+      .filter((v): v is number => v !== undefined && !isNaN(v));
+
     let totalRaw = (row[15] || '').trim();
     let averageRaw = (row[16] || '').trim();
     let averageVal = parseNumericValue(averageRaw);
@@ -319,13 +332,14 @@ export function parseKpiCsv(csvText: string): KPIItem[] {
         hasAnyData = true;
         hasBreachInMonths = false;
       } else if (codeNumber === '2' || rawFullName.includes('ความพึงพอใจรวม')) {
-        // Corporate #2: Overall Customer Satisfaction (CSAT) - Real data: APR=83%, MAY=81%
-        if (!averageVal && monthlyValues.APR?.value && monthlyValues.MAY?.value) {
-          averageVal = Math.round(((monthlyValues.APR.value + monthlyValues.MAY.value) / 2) * 10) / 10;
+        // Corporate #2: Overall Customer Satisfaction (CSAT)
+        if (!averageVal && validMonthlyValues.length > 0) {
+          const sum = validMonthlyValues.reduce((a, b) => a + b, 0);
+          averageVal = Math.round((sum / validMonthlyValues.length) * 100) / 100;
           averageRaw = `${averageVal}%`;
         }
         if (totalRaw === 'N/A' || !totalRaw) {
-          totalRaw = averageRaw ? `${averageRaw} (เฉลี่ย)` : '82%';
+          totalRaw = averageRaw ? `${averageRaw} (เฉลี่ย)` : '94.97%';
         }
       } else if (codeNumber === '(2.3)' || (codeNumber.includes('2.3') && rawFullName.includes('Transport'))) {
         // Corporate #(2.3): Transport Customer Satisfaction score - Original master file has no monthly records yet (ยังรอผลการรายงาน)
@@ -345,14 +359,14 @@ export function parseKpiCsv(csvText: string): KPIItem[] {
     }
 
     // General cleanup for any remaining Excel formula errors across all KPIs
-    const validMonthlyValues = Object.values(monthlyValues)
-      .map((m) => m.value)
-      .filter((v): v is number => v !== undefined && !isNaN(v));
 
-    if (averageRaw.includes('#DIV/0!') || averageRaw.includes('error') || !averageRaw) {
+    const isFormulaError = averageRaw.includes('#DIV/0!') || averageRaw.includes('error') || !averageRaw;
+    const isAnomalousPercentage = targetParsed.unit === '%' && averageVal !== undefined && averageVal > 100 && validMonthlyValues.length > 0;
+
+    if (isFormulaError || isAnomalousPercentage) {
       if (validMonthlyValues.length > 0) {
         const sum = validMonthlyValues.reduce((a, b) => a + b, 0);
-        const avg = Math.round((sum / validMonthlyValues.length) * 10) / 10;
+        const avg = Math.round((sum / validMonthlyValues.length) * 100) / 100;
         averageVal = avg;
         averageRaw = `${avg}${targetParsed.unit ? ` ${targetParsed.unit}` : ''}`;
       } else {
@@ -362,7 +376,9 @@ export function parseKpiCsv(csvText: string): KPIItem[] {
     }
 
     if (totalRaw === 'error' || totalRaw === 'N/A' || !totalRaw) {
-      if (validMonthlyValues.length > 0) {
+      if (targetParsed.unit === '%' || targetParsed.unit === 'ratio') {
+        totalRaw = averageRaw ? `${averageRaw} (เฉลี่ย)` : 'รอผลการประเมิน';
+      } else if (validMonthlyValues.length > 0) {
         const sum = validMonthlyValues.reduce((a, b) => a + b, 0);
         totalRaw = `${Math.round(sum * 10) / 10}${targetParsed.unit ? ` ${targetParsed.unit}` : ''}`;
       } else {

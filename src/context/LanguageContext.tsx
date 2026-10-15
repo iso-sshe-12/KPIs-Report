@@ -170,7 +170,7 @@ export interface Translations {
 export const translations: Record<Language, Translations> = {
   th: {
     navbar: {
-      title: 'FY2026 Executive KPI Dashboard',
+      title: 'FY2026 KPI Dashboard',
       liveBadge: 'Live Monitoring',
       subCorporate: 'เป้าหมายหลักองค์กร & รายฝ่าย',
       sheetsConnected: 'Google Sheets เชื่อมต่อแล้ว',
@@ -358,7 +358,7 @@ export const translations: Record<Language, Translations> = {
   },
   en: {
     navbar: {
-      title: 'FY2026 Executive KPI Dashboard',
+      title: 'FY2026 KPI Dashboard',
       liveBadge: 'Live Monitoring',
       subCorporate: 'Corporate & Departmental Objectives',
       sheetsConnected: 'Google Sheets Connected',
